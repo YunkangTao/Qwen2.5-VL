@@ -5,56 +5,51 @@ import os
 import json
 
 
-def get_messages(json_file):
-    # 读取 JSON 文件，注意确保文件编码与实际编码一致（例如 utf-8）
-    with open(json_file, "r", encoding="utf-8") as f:
-        data = json.load(f)
+def get_messages(data_info):
 
-    # 遍历 JSON 文件中每个字典
-    for item in data:
-        GT_IDs = item.get("GT_IDs")
-        T_query = item.get("T_query")
+    GT_IDs = data_info.get("GT_IDs")
+    T_query = data_info.get("T_query")
 
-        # 用于存放所有图片绝对路径的列表
-        abs_image_paths = []
+    # 用于存放所有图片绝对路径的列表
+    abs_image_paths = []
 
-        # 获取字典中对应 "ImagePoolFolder" 的路径
-        folder = item.get("ImagePoolFolder")
-        if folder and os.path.isdir(folder):
-            # 获取目录中的每个文件
-            for filename in os.listdir(folder):
-                file_path = os.path.join(folder, filename)
-                if os.path.isfile(file_path):
-                    # 获取文件的绝对路径并添加到列表中
-                    abs_path = os.path.abspath(file_path)
-                    abs_image_paths.append(abs_path)
+    # 获取字典中对应 "ImagePoolFolder" 的路径
+    folder = data_info.get("ImagePoolFolder")
+    if folder and os.path.isdir(folder):
+        # 获取目录中的每个文件
+        for filename in os.listdir(folder):
+            file_path = os.path.join(folder, filename)
+            if os.path.isfile(file_path):
+                # 获取文件的绝对路径并添加到列表中
+                abs_path = os.path.abspath(file_path)
+                abs_image_paths.append(abs_path)
 
-        abs_image_paths.sort()
+    abs_image_paths.sort()
 
-        messages_list = []
+    messages_list = []
 
-        for image_path in abs_image_paths:
-            message = [
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "image",
-                            "image": image_path,  # 使用图片的绝对路径
-                        },
-                        {
-                            "type": "text",
-                            "text": f"Does this image match the description? If so, answer 1. If not, answer 0: {T_query}",
-                        },
-                    ],
-                }
-            ]
-            messages_list.append(message)
+    for image_path in abs_image_paths:
+        message = [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image",
+                        "image": image_path,  # 使用图片的绝对路径
+                    },
+                    {
+                        "type": "text",
+                        "text": f"Does this image match the description? If so, answer 1. If not, answer 0: {T_query}",
+                    },
+                ],
+            }
+        ]
+        messages_list.append(message)
 
-        yield messages_list, folder, GT_IDs, T_query
+    return messages_list, folder, GT_IDs, T_query
 
 
-def main(json_file):
+def main(data_info):
     # default: Load the model on the available device(s)
     # model = Qwen2_5_VLForConditionalGeneration.from_pretrained("Qwen/Qwen2.5-VL-7B-Instruct", torch_dtype="auto", device_map="auto")
 
@@ -76,65 +71,48 @@ def main(json_file):
     processor = AutoProcessor.from_pretrained("Qwen/Qwen2.5-VL-7B-Instruct", min_pixels=min_pixels, max_pixels=max_pixels)
     processor.tokenizer.padding_side = "left"
 
-    # # Sample messages for batch inference
-    # messages1 = [
-    #     {
-    #         "role": "user",
-    #         "content": [
-    #             {"type": "image", "image": "file:///path/to/image1.jpg"},
-    #             {"type": "image", "image": "file:///path/to/image2.jpg"},
-    #             {"type": "text", "text": "What are the common elements in these pictures?"},
-    #         ],
-    #     }
-    # ]
-    # messages2 = [
-    #     {"role": "system", "content": "You are a helpful assistant."},
-    #     {"role": "user", "content": "Who are you?"},
-    # ]
-    # # Combine messages for batch processing
-    # messages = [messages1, messages2]
-
     with torch.no_grad():
-        for messages, folder, gt_list, T_query in get_messages(json_file):
-            try:
-                print(f"Processing images in folder: {folder}")
+        messages, folder, gt_list, T_query = get_messages(data_info)
 
-                save_path = folder.replace("/mnt2/lei", "./dataset_one_by_one")
-                os.makedirs(save_path, exist_ok=True)
+        print(f"Processing images in folder: {folder}")
 
-                # Preparation for batch inference
-                texts = [processor.apply_chat_template(msg, tokenize=False, add_generation_prompt=True) for msg in messages]
-                image_inputs, video_inputs = process_vision_info(messages)
-                inputs = processor(
-                    text=texts,
-                    images=image_inputs,
-                    videos=video_inputs,
-                    padding=True,
-                    return_tensors="pt",
-                )
-                inputs = inputs.to("cuda")
+        save_path = folder.replace("/mnt2/lei", "./dataset_one_by_one")
+        os.makedirs(save_path, exist_ok=True)
 
-                # Batch Inference
-                generated_ids = model.generate(**inputs, max_new_tokens=256)
-                generated_ids_trimmed = [out_ids[len(in_ids) :] for in_ids, out_ids in zip(inputs.input_ids, generated_ids)]
-                output_texts = processor.batch_decode(generated_ids_trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False)
-                print(output_texts)
-                print(len(output_texts))
+        # Preparation for batch inference
+        texts = [processor.apply_chat_template(msg, tokenize=False, add_generation_prompt=True) for msg in messages]
+        image_inputs, video_inputs = process_vision_info(messages)
+        inputs = processor(
+            text=texts,
+            images=image_inputs,
+            videos=video_inputs,
+            padding=True,
+            return_tensors="pt",
+        )
+        inputs = inputs.to("cuda")
 
-                prediction_index = [f"{index:05d}" for index, value in enumerate(output_texts, start=1) if value == 1 or value == '1']
+        # Batch Inference
+        generated_ids = model.generate(**inputs, max_new_tokens=256)
+        generated_ids_trimmed = [out_ids[len(in_ids) :] for in_ids, out_ids in zip(inputs.input_ids, generated_ids)]
+        output_texts = processor.batch_decode(generated_ids_trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False)
+        print(output_texts)
+        # print(len(output_texts))
 
-                output_content = {"prediction_one_hot": output_texts, "prediction": prediction_index, "GT_IDs": gt_list}
+        # prediction_index = [f"{index:05d}" for index, value in enumerate(output_texts, start=1) if value == 1 or value == '1']
 
-                with open(f"{save_path}/output.json", "w", encoding="utf-8") as f:
-                    json.dump(output_content, f, ensure_ascii=False, indent=4)
+        # output_content = {"prediction_one_hot": output_texts, "prediction": prediction_index, "GT_IDs": gt_list}
 
-                torch.cuda.empty_cache()
-
-            except Exception as e:
-                print(f"Error: {e}")
-                torch.cuda.empty_cache()
+        # with open(f"{save_path}/output.json", "w", encoding="utf-8") as f:
+        #     json.dump(output_content, f, ensure_ascii=False, indent=4)
 
 
 if __name__ == "__main__":
-    json_file = "/mnt2/lei/Qwen2.5-VL/dataset/annotation.json"
-    main(json_file)
+    # json_file = "/mnt2/lei/Qwen2.5-VL/dataset/annotation.json"
+    data_info = {
+        "CaseID": "case00044",
+        "T_query": "Please help me find the image index of document photos from ImagePoolFolder.",
+        "T_query_cn": "",
+        "ImagePoolFolder": "/mnt2/lei/RetrievalVLM/20250107_find_five_cases/case4_find_document_photo/ImagePoolFolder/",
+        "GT_IDs": ["1", "5", "8", "13", "14"],
+    }
+    main(data_info)

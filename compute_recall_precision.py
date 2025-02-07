@@ -62,7 +62,7 @@ def find_all_json_files(directory):
                 absolute_path = os.path.abspath(os.path.join(root, file))
                 json_file_paths.append(absolute_path)
 
-    return json_file_paths
+    return sorted(json_file_paths)
 
 
 def main(json_root_path):
@@ -76,10 +76,12 @@ def main(json_root_path):
 
         # 计算 recall 值
         recall_value = compute_recall(data['GT_IDs'], data['prediction'])
+        print("json_file:", json_file, ", Recall:", recall_value)
         recall_values.append(recall_value)
 
         # 计算 precision 值
         precision_value = compute_precision(data['GT_IDs'], data['prediction'])
+        print("json_file:", json_file, ", Precision:", precision_value)
         precision_values.append(precision_value)
 
     print("Recall values:", recall_values)
@@ -101,5 +103,5 @@ if __name__ == "__main__":
     # prediction = [1, 3, 6, 8, 12, 19]
     # recall_value = compute_recall(ground_truth, prediction)
     # print("Recall:", recall_value)
-    json_root_path = "/mnt2/lei/Qwen2.5-VL/dataset"
+    json_root_path = "/mnt2/lei/Qwen2.5-VL/dataset_one_by_one"
     main(json_root_path)
