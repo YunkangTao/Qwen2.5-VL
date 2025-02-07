@@ -9,4 +9,4 @@ wheels/
 # venv
 .venv
 FPS_case/
-dataset/
+dataset*/

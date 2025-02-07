@@ -71,8 +71,8 @@ def main(json_file):
 
     # The default range for the number of visual tokens per image in the model is 4-16384.
     # You can set min_pixels and max_pixels according to your needs, such as a token range of 256-1280, to balance performance and cost.
-    min_pixels = 256 * 28 * 28
-    max_pixels = 512 * 28 * 28
+    min_pixels = 128 * 28 * 28
+    max_pixels = 256 * 28 * 28
     processor = AutoProcessor.from_pretrained("Qwen/Qwen2.5-VL-7B-Instruct", min_pixels=min_pixels, max_pixels=max_pixels)
     processor.tokenizer.padding_side = "left"
 
@@ -96,75 +96,80 @@ def main(json_file):
 
     with torch.no_grad():
         for messages, folder, gt_list, T_query in get_messages(json_file):
-            print(f"Processing images in folder: {folder}")
+            try:
+                print(f"Processing images in folder: {folder}")
 
-            save_path = folder.replace("/mnt2/lei", "./dataset")
-            os.makedirs(save_path, exist_ok=True)
+                save_path = folder.replace("/mnt2/lei", "./dataset")
+                os.makedirs(save_path, exist_ok=True)
 
-            # Preparation for batch inference
-            texts = [processor.apply_chat_template(msg, tokenize=False, add_generation_prompt=True) for msg in messages]
-            image_inputs, video_inputs = process_vision_info(messages)
-            inputs = processor(
-                text=texts,
-                images=image_inputs,
-                videos=video_inputs,
-                padding=True,
-                return_tensors="pt",
-            )
-            inputs = inputs.to("cuda")
+                # Preparation for batch inference
+                texts = [processor.apply_chat_template(msg, tokenize=False, add_generation_prompt=True) for msg in messages]
+                image_inputs, video_inputs = process_vision_info(messages)
+                inputs = processor(
+                    text=texts,
+                    images=image_inputs,
+                    videos=video_inputs,
+                    padding=True,
+                    return_tensors="pt",
+                )
+                inputs = inputs.to("cuda")
 
-            # Batch Inference
-            generated_ids = model.generate(**inputs, max_new_tokens=256)
-            generated_ids_trimmed = [out_ids[len(in_ids) :] for in_ids, out_ids in zip(inputs.input_ids, generated_ids)]
-            output_texts = processor.batch_decode(generated_ids_trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False)
-            print(output_texts)
+                # Batch Inference
+                generated_ids = model.generate(**inputs, max_new_tokens=256)
+                generated_ids_trimmed = [out_ids[len(in_ids) :] for in_ids, out_ids in zip(inputs.input_ids, generated_ids)]
+                output_texts = processor.batch_decode(generated_ids_trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False)
+                print(output_texts)
 
-            messages = [
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": output_texts[i],
-                        }
-                        for i in range(len(output_texts))
-                    ]
-                    + [
-                        {
-                            "type": "text",
-                            "text": f"The above are some descriptions of the images. Please help me find which ones are most suitable for Tquery. Just list them without explanation. For example, you can output [1, 3, 5]. The Tquery is:{T_query}",
-                        }
-                    ],
+                messages = [
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": output_texts[i],
+                            }
+                            for i in range(len(output_texts))
+                        ]
+                        + [
+                            {
+                                "type": "text",
+                                "text": f"The above are some descriptions of the images. Please help me find which ones are most suitable for Tquery. Just list them without explanation. For example, you can output [1, 3, 5]. The Tquery is:{T_query}",
+                            }
+                        ],
+                    }
+                ]
+
+                # Preparation for inference
+                text = processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+                image_inputs, video_inputs = process_vision_info(messages)
+                inputs = processor(
+                    text=[text],
+                    images=image_inputs,
+                    videos=video_inputs,
+                    padding=True,
+                    return_tensors="pt",
+                )
+                inputs = inputs.to(model.device)
+
+                # Inference: Generation of the output
+                generated_ids = model.generate(**inputs, max_new_tokens=128)
+                generated_ids_trimmed = [out_ids[len(in_ids) :] for in_ids, out_ids in zip(inputs.input_ids, generated_ids)]
+                output_text = processor.batch_decode(generated_ids_trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False)
+
+                output_content = {
+                    "prediction": output_text,
+                    "GT_IDs": gt_list,
+                    "res": [{"id": f"{i+1}", "answer": f"{output_texts[i]}", "similarity": None} for i in range(len(output_texts))],
                 }
-            ]
 
-            # Preparation for inference
-            text = processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
-            image_inputs, video_inputs = process_vision_info(messages)
-            inputs = processor(
-                text=[text],
-                images=image_inputs,
-                videos=video_inputs,
-                padding=True,
-                return_tensors="pt",
-            )
-            inputs = inputs.to(model.device)
+                with open(f"{save_path}/output.json", "w", encoding="utf-8") as f:
+                    json.dump(output_content, f, ensure_ascii=False, indent=4)
 
-            # Inference: Generation of the output
-            generated_ids = model.generate(**inputs, max_new_tokens=128)
-            generated_ids_trimmed = [out_ids[len(in_ids) :] for in_ids, out_ids in zip(inputs.input_ids, generated_ids)]
-            output_text = processor.batch_decode(generated_ids_trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False)
+                torch.cuda.empty_cache()
 
-            output_content = {
-                "prediction": output_text,
-                "GT_IDs": gt_list,
-                "res": [{"id": f"{i+1}", "answer": f"{output_texts[i]}", "similarity": None} for i in range(len(output_texts))],
-            }
-
-            with open(f"{save_path}/output.json", "w", encoding="utf-8") as f:
-                json.dump(output_content, f, ensure_ascii=False, indent=4)
-
-            torch.cuda.empty_cache()
+            except Exception as e:
+                print(f"Error: {e}")
+                torch.cuda.empty_cache()
 
 
 if __name__ == "__main__":

@@ -100,7 +100,7 @@ def main(json_file):
         for messages, folder, gt_list, T_query, caseid in get_messages(json_file):
             print(f"Processing images in folder: {folder}")
 
-            save_path = folder.replace("/mnt2/lei", "./dataset")
+            save_path = folder.replace("/mnt2/lei", "./dataset_janus")
             os.makedirs(save_path, exist_ok=True)
 
             # Preparation for batch inference
@@ -123,8 +123,9 @@ def main(json_file):
             janus_out = os.path.join(janus_out_path, caseid+'.json')
             with open(janus_out, "r", encoding="utf-8") as file:
                 data = json.load(file)
-            captions = data['captions']
-            query = data['query']
+            # print(type(data), data.keys())
+            captions = data["captions"]
+            query = data["query"]
             messages = [
                 {
                     "role": "user",
