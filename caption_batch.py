@@ -173,8 +173,5 @@ def main(json_file):
 
 
 if __name__ == "__main__":
-
-    # 假设 JSON 文件的路径为 data.json
     json_file = "/mnt2/lei/Qwen2.5-VL/dataset/annotation.json"
-
     main(json_file)
