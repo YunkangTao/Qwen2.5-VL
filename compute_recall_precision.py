@@ -20,14 +20,29 @@ def compute_recall(ground_truth, prediction):
         return 0.0
 
     # 将列表转换为集合以去重，然后计算交集元素
-    gt_set = set(ground_truth)
-    pred_set = set(prediction)
+    gt_set = set(int(x) for x in ground_truth)
+    pred_set = set(int(x) for x in prediction)
 
     # 真阳性（ground_truth 中预测正确的元素）
     true_positives = gt_set.intersection(pred_set)
 
     recall = len(true_positives) / len(gt_set)
     return recall
+
+
+def compute_precision(ground_truth, prediction):
+    if not prediction:
+        return 0.0
+
+    # 将列表转换为集合以去重，然后计算交集元素
+    gt_set = set(int(x) for x in ground_truth)
+    pred_set = set(int(x) for x in prediction)
+
+    # 真阳性（ground_truth 中预测正确的元素）
+    true_positives = gt_set.intersection(pred_set)
+
+    precision = len(true_positives) / len(pred_set)
+    return precision
 
 
 def find_all_json_files(directory):
@@ -53,6 +68,7 @@ def find_all_json_files(directory):
 def main(json_root_path):
     all_json_files = find_all_json_files(json_root_path)
     recall_values = []
+    precision_values = []
     for json_file in all_json_files:
         # 读取 JSON 文件中的数据
         with open(json_file, 'r') as f:
@@ -62,11 +78,21 @@ def main(json_root_path):
         recall_value = compute_recall(data['GT_IDs'], data['prediction'])
         recall_values.append(recall_value)
 
+        # 计算 precision 值
+        precision_value = compute_precision(data['GT_IDs'], data['prediction'])
+        precision_values.append(precision_value)
+
     print("Recall values:", recall_values)
     print("Number of files:", len(recall_values))
     print("1-40 average recall:", sum(recall_values[:40]) / 40)
     print("41-80 average recall:", sum(recall_values[40:80]) / 40)
     print("Average recall:", sum(recall_values) / len(recall_values))
+
+    print("Precision values:", precision_values)
+    print("Number of files:", len(precision_values))
+    print("1-40 average precision:", sum(precision_values[:40]) / 40)
+    print("41-80 average precision:", sum(precision_values[40:80]) / 40)
+    print("Average precision:", sum(precision_values) / len(precision_values))
 
 
 # 测试示例
