@@ -81,7 +81,7 @@ def main(json_file):
             try:
                 print(f"Processing images in folder: {folder}")
 
-                save_path = folder.replace("/mnt2/lei", "./dataset_one_by_one")
+                save_path = folder.replace("/mnt2/lei", "./dataset_one_by_one_refine_tquery_20250210")
                 os.makedirs(save_path, exist_ok=True)
 
                 # Preparation for batch inference
@@ -118,5 +118,5 @@ def main(json_file):
 
 
 if __name__ == "__main__":
-    json_file = "/mnt2/lei/Qwen2.5-VL/dataset/annotation.json"
+    json_file = "dataset/annotation.json"
     main(json_file)

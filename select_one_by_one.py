@@ -110,7 +110,7 @@ if __name__ == "__main__":
     # json_file = "/mnt2/lei/Qwen2.5-VL/dataset/annotation.json"
     data_info = {
         "CaseID": "case00044",
-        "T_query": "Please help me find the image index of document photos from ImagePoolFolder.",
+        "T_query": "document photos",
         "T_query_cn": "",
         "ImagePoolFolder": "/mnt2/lei/RetrievalVLM/20250107_find_five_cases/case4_find_document_photo/ImagePoolFolder/",
         "GT_IDs": ["1", "5", "8", "13", "14"],

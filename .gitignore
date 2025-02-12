@@ -10,3 +10,4 @@ wheels/
 .venv
 FPS_case/
 dataset*/
+result*/

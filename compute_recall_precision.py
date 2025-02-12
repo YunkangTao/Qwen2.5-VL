@@ -103,5 +103,5 @@ if __name__ == "__main__":
     # prediction = [1, 3, 6, 8, 12, 19]
     # recall_value = compute_recall(ground_truth, prediction)
     # print("Recall:", recall_value)
-    json_root_path = "/mnt2/lei/Qwen2.5-VL/dataset_one_by_one"
+    json_root_path = "/mnt2/lei/Qwen2.5-VL/result_one_by_one_refine_tquery_20250210"
     main(json_root_path)
